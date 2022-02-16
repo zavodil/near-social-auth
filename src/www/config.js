@@ -1,4 +1,5 @@
-const NEAR_SOCIAL_CONTRACT_ID = "zavodil.testnet";
+const NEAR_SOCIAL_CONTRACT_ID = "social.near";
+const DEFAULT_NETWORK = "mainnet";
 
 function getConfig(env) {
     switch (env) {
@@ -25,4 +26,4 @@ function getConfig(env) {
     }
 }
 
-module.exports = {NEAR_SOCIAL_CONTRACT_ID, getConfig}
+module.exports = {NEAR_SOCIAL_CONTRACT_ID, DEFAULT_NETWORK, getConfig}

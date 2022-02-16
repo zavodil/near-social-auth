@@ -5,7 +5,7 @@ const bodyParser = require('body-parser')
 const nearApi = require('near-api-js');
 const sha256 = require('js-sha256').sha256;
 const fetch = require("node-fetch");
-const {NEAR_SOCIAL_CONTRACT_ID, getConfig} = require('../www/config');
+const {NEAR_SOCIAL_CONTRACT_ID, DEFAULT_NETWORK, getConfig} = require('../www/config');
 const NEAR_SOCIAL_SERVER_API_V1 = 'https://near.social/api/v1/';
 const NEAR_SOCIAL_APP_TOKEN = '_IYKKmRoU8pQeYWC8jLvdJ7SakH5xTs1z9IClMYDBXs';
 const MESSAGE = 'Future Is NEAR';
@@ -116,7 +116,7 @@ app.post('/api/verify', jsonParser, async (req, res) => {
 
     if (result) {
         let accountId = req.body.account_id;
-        const nearConfig = getConfig(process.env.NODE_ENV || 'development');
+        const nearConfig = getConfig(process.env.NODE_ENV || DEFAULT_NETWORK);
         nearConfig.keyStore = new nearApi.keyStores.InMemoryKeyStore();
 
         const near = await nearApi.connect(nearConfig);
@@ -200,7 +200,7 @@ app.post('/api/account-exists', jsonParser, async (req, res) => {
     console.log(username)
     console.log(account)
 
-    res.send(generateResponse(!!account, ""));
+    res.send(generateResponse(!!account, JSON.stringify({approved: account?.approved})));
 })
 
 app.listen(port, () => console.log(`NEAR Social Auth Backend listening on port ${port}!`))

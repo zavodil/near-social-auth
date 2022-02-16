@@ -1,7 +1,7 @@
 import React, {Component} from 'react'
 import * as nearApi from 'near-api-js';
 import {sha256} from 'js-sha256';
-import {NEAR_SOCIAL_CONTRACT_ID, getConfig} from './config'
+import {NEAR_SOCIAL_CONTRACT_ID, DEFAULT_NETWORK, getConfig} from './config'
 import './App.css'
 
 
@@ -9,8 +9,12 @@ class App extends Component {
     state = {
         isLoggedIn: false,
         isAccountExists: false,
+        isAccountApproved: false,
+        isRegistrationComplete: false,
+        registrationUsername: '',
+        registrationSignature: '',
         userAccount: 'Unknown',
-        userPassword: ''
+        userPassword: '****************'
     }
 
     componentDidMount = async () => {
@@ -94,11 +98,36 @@ class App extends Component {
                 })
             })
             .then(res => res.json())
-            .then(res => res.status);
+            .then(res => {
+                return {status: res.status, approved: JSON.parse(res.message)?.approved}
+            });
     }
 
     generatePassword = (signature) => {
         return Buffer.from(new Uint8Array(signature.signature.toString().split(','))).toString('base64').substr(70, 16)
+    }
+
+    loginToSocial = () => {
+        const form = document.createElement("form");
+        const email = document.createElement("input");
+        email.value = `${this.state.registrationUsername}@near.social`;
+        email.name = "user[email]";
+        email.type = "email";
+        const password = document.createElement("input");
+        password.value = Buffer.from(new Uint8Array(this.state.registrationSignature.split(','))).toString('base64').substr(70, 16);
+        password.name = "user[password]";
+        password.type = "password";
+        form.action = "https://near.social/auth/sign_in";
+        form.method = "POST";
+        form.name = "sign-in";
+        form.appendChild(email);
+        form.appendChild(password);
+        document.body.appendChild(form);
+
+        if (document.forms['sign-in']) { // when form is present
+            //console.log(password)
+            document.forms['sign-in'].submit();
+        }
     }
 
     nearAuth = async () => {
@@ -106,25 +135,11 @@ class App extends Component {
                 if (response.status) {
                     let data = JSON.parse(response.message);
                     if (data.username) {
-                        const form = document.createElement("form");
-                        const email = document.createElement("input");
-                        email.value = `${data.username}@near.social`;
-                        email.name = "user[email]";
-                        email.type = "email";
-                        const password = document.createElement("input");
-                        password.value = Buffer.from(new Uint8Array(signature.signature.toString().split(','))).toString('base64').substr(70, 16);
-                        password.name = "user[password]";
-                        password.type = "password";
-                        form.action = "https://near.social/auth/sign_in";
-                        form.method = "POST";
-                        form.name = "sign-in";
-                        form.appendChild(email);
-                        form.appendChild(password);
-                        document.body.appendChild(form);
-
-                        if (document.forms['sign-in']) { // when form is present
-                            document.forms['sign-in'].submit();
-                        }
+                        this.setState({
+                            isRegistrationComplete: true,
+                            registrationUsername: data.username,
+                            registrationSignature: signature.signature.toString()
+                        });
                     }
                 }
             }
@@ -134,6 +149,7 @@ class App extends Component {
     nearLogout = async () => {
         const wallet = await this.getWallet();
         wallet.signOut();
+        window.location.reload(false);
     }
 
     getWallet = async () => {
@@ -143,17 +159,21 @@ class App extends Component {
             window.accountId = window.walletConnection.getAccountId();
 
             if (window.accountId) {
+                const {status, approved} = await this.isAccountExists(window.accountId);
                 this.setState({
-                    userAccount: window.accountId.substr(0, window.accountId.lastIndexOf(".")),
-                    isAccountExists: await this.isAccountExists(window.accountId)
+                    userAccount: window.accountId.substr(0, window.accountId.lastIndexOf(".")) + "@near.social",
+                    isAccountExists: status,
+                    isAccountApproved: approved
                 })
+
+                await this.nearAuth()
             }
         }
         return window.walletConnection;
     }
 
     getConfig = () => {
-        const nearConfig = getConfig(process.env.NODE_ENV || 'development')
+        const nearConfig = getConfig(process.env.NODE_ENV || DEFAULT_NETWORK)
 
         nearConfig.keyStore = new nearApi.keyStores.BrowserLocalStorageKeyStore();
 
@@ -177,21 +197,23 @@ class App extends Component {
 
                     {this.state.isLoggedIn &&
                         <>
-                            <button onClick={this.nearAuth} className="App-button">
-                                Auth
+                            <button onClick={this.loginToSocial} className="App-button" disabled={!this.state.isRegistrationComplete} >
+                                Login to NEAR Social
                             </button>
 
+                            {/*
                             <button onClick={this.nearLogout} className="App-button">
                                 Logout
                             </button>
+                            */}
 
                             {this.state.isAccountExists && <>
                                 <hr/>
-                                <h2>Your account: {this.state.userAccount}</h2>
-                                <p>
-                                    Password <code>{this.state.userPassword}</code>
+                                <div>Your account: <strong>{this.state.userAccount}</strong></div>
+                                <div>
+                                    Password <code className="social-password">{this.state.userPassword}</code>
                                     <button onClick={this.getPassword} className="App-button-small">Reveal</button>
-                                </p>
+                                </div>
                             </>}
                         </>
                     }
