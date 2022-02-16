@@ -1,3 +1,7 @@
+body {
+  background-color: #282c34;
+}
+
 .App {
   text-align: center;
 }
@@ -27,6 +31,19 @@
   font-weight: bold;
   border: 2px solid white;
   border-radius: 5px;
+  background: #323743;
+  color: white;
+  animation: App-logo-spin infinite 5s linear;
+  cursor: pointer;
+}
+
+.App-button-small {
+  vertical-align: baseline;
+  padding: 5px;
+  font-size: 1rem;
+  font-weight: bold;
+  border: 1px solid white;
+  border-radius: 3px;
   background: #323743;
   color: white;
   animation: App-logo-spin infinite 5s linear;
