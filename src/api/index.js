@@ -140,7 +140,11 @@ app.post('/api/verify', jsonParser, async (req, res) => {
             console.log(account)
             if (!!account){
                 if(!account?.approved){
-                    await ApproveAccount(account.id);
+                    let result = await ApproveAccount(account.id);
+                    if(!result.hasOwnProperty('error')) {
+                        console.log(`Account ${username} approved`);
+                    }
+                    console.log(result)
                     res.send(generateResponse(true, JSON.stringify({username})));
                 }
                 else {
@@ -150,10 +154,15 @@ app.post('/api/verify', jsonParser, async (req, res) => {
             else {
                 let result = await CreateAccount(username, password);
                 console.log(`Account ${username} created`);
-                let account = GetAccount(username);
+                console.log(result)
+                let account = await GetAccount(username);
+                console.log(`Account approval status: ${account.approved}`);
                 if(!account?.approved){
-                    await ApproveAccount(account.id);
-                    console.log(`Account ${username} approved`);
+                    result = await ApproveAccount(account.id);
+                    if(!result.hasOwnProperty('error')) {
+                        console.log(`Account ${username}/${account.id} approved`);
+                    }
+                    console.log(result)
                     res.send(generateResponse(true, JSON.stringify({username})));
                 }
             }
