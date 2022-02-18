@@ -34,9 +34,9 @@
     "prettier": "^1.17.1"
   },
   "scripts": {
-    "start": "bash bin/dev.sh",
-    "api": "bash bin/dev_api.sh",
-    "build": "react-scripts build",
+    "start": "export PORT=3001 && bash bin/dev.sh",
+    "api": "export PORT=4001 && bash bin/dev_api.sh",
+    "build": "export PORT=3001 && react-scripts build",
     "deploy": "deploy-node-app",
     "test": "react-scripts test",
     "eject-www": "react-scripts eject",
@@ -53,13 +53,13 @@
   ],
   "deploy-node-app": {
     "prod": {
-      "port": 4321,
+      "port": 4001,
       "protocol": "http",
       "entrypoint": "src/api/index.js",
       "type": "spa"
     },
     "dev": {
-      "port": 4321,
+      "port": 4001,
       "protocol": "http",
       "entrypoint": "src/api/index.js",
       "registry": "",
@@ -67,5 +67,5 @@
       "isPublic": false
     }
   },
-  "proxy": "http://localhost:4321"
+  "proxy": "http://localhost:4001"
 }

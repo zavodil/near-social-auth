@@ -10,7 +10,7 @@ const NEAR_SOCIAL_SERVER_API_V1 = 'https://near.social/api/v1/';
 const MESSAGE = 'Future Is NEAR';
 
 const app = express()
-const port = 4321
+const port = 4001
 const jsonParser = bodyParser.json();
 
 app.get('/api/challenge', (req, res) => {
