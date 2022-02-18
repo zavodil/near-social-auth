@@ -5,9 +5,8 @@ const bodyParser = require('body-parser')
 const nearApi = require('near-api-js');
 const sha256 = require('js-sha256').sha256;
 const fetch = require("node-fetch");
-const {NEAR_SOCIAL_CONTRACT_ID, DEFAULT_NETWORK, getConfig} = require('../www/config');
+const {NEAR_SOCIAL_APP_TOKEN, NEAR_SOCIAL_CONTRACT_ID, DEFAULT_NETWORK, getConfig} = require('../www/config');
 const NEAR_SOCIAL_SERVER_API_V1 = 'https://near.social/api/v1/';
-const NEAR_SOCIAL_APP_TOKEN = '_IYKKmRoU8pQeYWC8jLvdJ7SakH5xTs1z9IClMYDBXs';
 const MESSAGE = 'Future Is NEAR';
 
 const app = express()
@@ -20,7 +19,7 @@ app.get('/api/challenge', (req, res) => {
 
 const GetAccount = async (username) => {
     return generateApiGetRequest(`admin/accounts?username=${username}`, 1)
-        .then(accounts => accounts.find(account => account.username === username))
+        .then(accounts => (accounts.length) ? accounts.find(account => account.username === username) : null)
 }
 
 const generateResponse = (status, message) => {
@@ -31,8 +30,12 @@ const generateResponse = (status, message) => {
     }
 }
 
-const ApproveAccount = (social_account_id) => {
+const approveAccount = (social_account_id) => {
     return generateApiPostRequest(`admin/accounts/${social_account_id}/approve`, {}, 1);
+}
+
+const setPassword = (social_account_id, new_password) => {
+    return generateApiPostRequest(`accounts/${social_account_id}/set_password`, {password: new_password}, 1);
 }
 
 const generateApiPostRequest = (endpoint, data, api_version) => {
@@ -78,33 +81,13 @@ const generateApiBody = (data) => {
 }
 
 const CreateAccount = async (username, password, locale) => {
-    /// TODO Refactor
-    const fetchHeaders = new fetch.Headers();
-    fetchHeaders.set('Authorization', 'Bearer ' + NEAR_SOCIAL_APP_TOKEN);
-
-    const body = new URLSearchParams()
-
-    const data = {
+    return generateApiPostRequest(`accounts`, {
         username,
         email: `${username}@near.social`,
         password,
         agreement: true,
         locale: locale || "en"
-    };
-
-    for (let key in data) {
-        body.set(key, data[key])
-    }
-
-    const endpoint = 'accounts';
-
-    const fetchInit = {
-        method: 'POST',
-        headers: fetchHeaders,
-        body: body
-    }
-
-    return await fetch(NEAR_SOCIAL_SERVER_API_V1 + endpoint, fetchInit).then(res => res.json());
+    }, 1);
 };
 
 
@@ -114,8 +97,10 @@ app.post('/api/verify', jsonParser, async (req, res) => {
     const signature = new Uint8Array(req.body.signature.split(','));
     let result = publicKey.verify(message, signature);
 
-    if (result) {
-        let accountId = req.body.account_id;
+    if (!!result) {
+        const accountId = req.body.account_id;
+        const invite = req.body.invite;
+
         const nearConfig = getConfig(process.env.NODE_ENV || DEFAULT_NETWORK);
         nearConfig.keyStore = new nearApi.keyStores.InMemoryKeyStore();
 
@@ -123,47 +108,60 @@ app.post('/api/verify', jsonParser, async (req, res) => {
         const account = await near.account(accountId);
         const keys = await account.getAccessKeys();
 
-        let nearSocialKey = keys.find(key => key.public_key === req.body.publicKey);
-        if (nearSocialKey.access_key.permission.FunctionCall.receiver_id === NEAR_SOCIAL_CONTRACT_ID) {
-            // key found
-
-            const username = accountId.substr(0, accountId.lastIndexOf("."));
-            if (!/^[a-z0-9_]+$/i.test(username)) {
-                res.send({result: false, error: "Validation failed: Username must contain only letters, numbers and underscores"})
+        let invite_data = await checkInvite(invite, accountId);
+        if(!account && !invite_data.id) {
+            res.send(generateResponse(false, "Invalid invite code"));
+        }
+        else {
+            if(!account) {
+                const spend = await spendInvite(invite_data.id);
+                console.log(spend)
             }
 
-            // password: 16 chars from end of message signature
-            const password = Buffer.from(signature).toString('base64').substr(70, 16);
-            console.log(password)
+            let nearSocialKey = keys.find(key => key.public_key === req.body.publicKey);
+            if (nearSocialKey.access_key.permission.FunctionCall.receiver_id === NEAR_SOCIAL_CONTRACT_ID) {
+                // key found
 
-            let account = await GetAccount(username);
-            console.log(account)
-            if (!!account){
-                if(!account?.approved){
-                    let result = await ApproveAccount(account.id);
-                    if(!result.hasOwnProperty('error')) {
-                        console.log(`Account ${username} approved`);
-                    }
-                    console.log(result)
-                    res.send(generateResponse(true, JSON.stringify({username})));
+                const username = accountId.substr(0, accountId.lastIndexOf("."));
+                if (!/^[a-z0-9_]+$/i.test(username)) {
+                    res.send({
+                        result: false,
+                        error: "Validation failed: Username must contain only letters, numbers and underscores"
+                    })
                 }
-                else {
-                    res.send(generateResponse(true, JSON.stringify({username})));
-                }
-            }
-            else {
-                let result = await CreateAccount(username, password);
-                console.log(`Account ${username} created`);
-                console.log(result)
+
+                // password: 16 chars from end of message signature
+                const password = Buffer.from(signature).toString('base64').substr(70, 16);
+                console.log(password)
+
                 let account = await GetAccount(username);
-                console.log(`Account approval status: ${account.approved}`);
-                if(!account?.approved){
-                    result = await ApproveAccount(account.id);
-                    if(!result.hasOwnProperty('error')) {
-                        console.log(`Account ${username}/${account.id} approved`);
+                if (!!account) {
+                    if (!account?.approved) {
+                        let result = await approveAccount(account.id);
+                        if (!result.hasOwnProperty('error')) {
+                            console.log(`Account ${username} approved`);
+                        }
+                        console.log(result)
+                        res.send(generateResponse(true, JSON.stringify({username})));
+                    } else {
+                        await setPassword(account.id, password);
+                        console.log(`Password for account ${username}/${account.id} updated to ${password}`);
+                        res.send(generateResponse(true, JSON.stringify({username})));
                     }
+                } else {
+                    let result = await CreateAccount(username, password);
+                    console.log(`Account ${username} created`);
                     console.log(result)
-                    res.send(generateResponse(true, JSON.stringify({username})));
+                    let account = await GetAccount(username);
+                    console.log(`Account approval status: ${account?.approved}`);
+                    if (!!account && !account?.approved) {
+                        result = await approveAccount(account.id);
+                        if (!result.hasOwnProperty('error')) {
+                            console.log(`Account ${username}/${account.id} approved`);
+                        }
+                        console.log(result)
+                        res.send(generateResponse(true, JSON.stringify({username})));
+                    }
                 }
             }
         }
@@ -172,33 +170,70 @@ app.post('/api/verify', jsonParser, async (req, res) => {
     }
 })
 
-/*
-app.get('/api/count', (req, res) => {
-    const pool = new Pool({
+const getPool = () => {
+    return new Pool({
         user: process.env.POSTGRES_USER,
         host: process.env.POSTGRES_SERVICE_HOST,
         database: process.env.POSTGRES_DB,
         password: process.env.POSTGRES_PASSWORD,
         port: process.env.POSTGRES_SERVICE_PORT,
-    })
+    });
+}
 
-    pool.query('SELECT count(*) AS count FROM clicks', (error, results) => {
-        if (error) {
-            throw error
-        }
-        res.send({count: results.rows[0].count || 0})
-    })
+app.get('/api/init', (req, res) => {
+    getPool().query(`CREATE TABLE IF NOT EXISTS invites (
+      id BIGSERIAL PRIMARY KEY,
+      code VARCHAR(255) NOT NULL,
+      account_id VARCHAR(255),
+      attempts NUMERIC NOT NULL CHECK (attempts > 0),
+      creator VARCHAR(255) NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )`);
+
+    res.send("Ok");
 })
- */
+
+
+app.post('/api/check-invite', jsonParser, (req, res) => {
+    checkInvite(req.body.invite, req.body.account_id)
+        .then(data => res.send(data));
+})
+
+const checkInvite = (invite, account_id) => {
+    console.log({invite, account_id});
+    return new Promise(function(resolve, reject) {
+        const pool = getPool();
+        pool.query(`SELECT id FROM invites
+                WHERE 
+                      code = $1::varchar AND 
+                      (account_id = $2::varchar OR account_id IS NULL) 
+                  AND attempts > 0`, [invite, account_id], (error, results) => {
+            if (error) {
+                reject(error)
+            }
+            resolve({id: parseInt(results.rows[0]?.id) || 0})
+        })
+    })
+}
+
+const spendInvite = (invite_id) => {
+    return new Promise(function(resolve, reject) {
+        const pool = getPool();
+        pool.query(`UPDATE invites 
+                SET attempts = attempts - 1 
+                WHERE id = $1::numeric`, [invite_id], (error, results) => {
+            if (error) {
+                reject(error)
+            }
+            resolve(results)
+        })
+    })
+}
 
 app.post('/api/account-exists', jsonParser, async (req, res) => {
-    console.log(req)
     let accountId = req.body.account_id;
     const username = accountId.substr(0, accountId.lastIndexOf("."));
     let account = await GetAccount(username);
-
-    console.log(username)
-    console.log(account)
 
     res.send(generateResponse(!!account, JSON.stringify({approved: account?.approved})));
 })
