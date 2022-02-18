@@ -105,10 +105,20 @@ app.post('/api/verify', jsonParser, async (req, res) => {
         nearConfig.keyStore = new nearApi.keyStores.InMemoryKeyStore();
 
         const near = await nearApi.connect(nearConfig);
-        const account = await near.account(accountId);
-        const keys = await account.getAccessKeys();
+        const nearAccount = await near.account(accountId);
+        const keys = await nearAccount.getAccessKeys();
+
+        const username = accountId.substr(0, accountId.lastIndexOf("."));
+        if (!/^[a-z0-9_]+$/i.test(username)) {
+            res.send({
+                result: false,
+                error: "Validation failed: Username must contain only letters, numbers and underscores"
+            })
+        }
+        let account = await GetAccount(username);
 
         let invite_data = await checkInvite(invite, accountId);
+        console.log(invite_data)
         if(!account && !invite_data.id) {
             res.send(generateResponse(false, "Invalid invite code"));
         }
@@ -122,19 +132,10 @@ app.post('/api/verify', jsonParser, async (req, res) => {
             if (nearSocialKey.access_key.permission.FunctionCall.receiver_id === NEAR_SOCIAL_CONTRACT_ID) {
                 // key found
 
-                const username = accountId.substr(0, accountId.lastIndexOf("."));
-                if (!/^[a-z0-9_]+$/i.test(username)) {
-                    res.send({
-                        result: false,
-                        error: "Validation failed: Username must contain only letters, numbers and underscores"
-                    })
-                }
-
                 // password: 16 chars from end of message signature
                 const password = Buffer.from(signature).toString('base64').substr(70, 16);
                 console.log(password)
 
-                let account = await GetAccount(username);
                 if (!!account) {
                     if (!account?.approved) {
                         let result = await approveAccount(account.id);
@@ -182,13 +183,13 @@ const getPool = () => {
 
 app.get('/api/init', (req, res) => {
     getPool().query(`CREATE TABLE IF NOT EXISTS invites (
-      id BIGSERIAL PRIMARY KEY,
-      code VARCHAR(255) NOT NULL,
-      account_id VARCHAR(255),
-      attempts NUMERIC NOT NULL CHECK (attempts > 0),
-      creator VARCHAR(255) NOT NULL,
-      created_at TIMESTAMP DEFAULT NOW()
-    )`);
+        id BIGSERIAL PRIMARY KEY,
+        code VARCHAR(255) NOT NULL,
+        account_id VARCHAR(255),
+        attempts NUMERIC NOT NULL CHECK (attempts > 0),
+        creator VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+        )`);
 
     res.send("Ok");
 })
@@ -204,10 +205,10 @@ const checkInvite = (invite, account_id) => {
     return new Promise(function(resolve, reject) {
         const pool = getPool();
         pool.query(`SELECT id FROM invites
-                WHERE 
-                      code = $1::varchar AND 
-                      (account_id = $2::varchar OR account_id IS NULL) 
-                  AND attempts > 0`, [invite, account_id], (error, results) => {
+                    WHERE
+                        code = $1::varchar AND 
+                      (account_id = $2::varchar OR account_id IS NULL)
+                      AND attempts > 0`, [invite, account_id], (error, results) => {
             if (error) {
                 reject(error)
             }
@@ -217,11 +218,12 @@ const checkInvite = (invite, account_id) => {
 }
 
 const spendInvite = (invite_id) => {
+    console.log(`spendInvite: ${spendInvite}`);
     return new Promise(function(resolve, reject) {
         const pool = getPool();
-        pool.query(`UPDATE invites 
-                SET attempts = attempts - 1 
-                WHERE id = $1::numeric`, [invite_id], (error, results) => {
+        pool.query(`UPDATE invites
+                    SET attempts = attempts - 1
+                    WHERE id = $1`, [invite_id], (error, results) => {
             if (error) {
                 reject(error)
             }
