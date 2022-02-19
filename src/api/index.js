@@ -31,7 +31,15 @@ const generateResponse = (status, message) => {
 }
 
 const approveAccount = (social_account_id) => {
-    return generateApiPostRequest(`admin/accounts/${social_account_id}/approve`, {}, 1);
+    return generateApiPostRequest(`admin/accounts/${social_account_id}/approve`, {}, 1).then(result => {
+        console.log(result)
+        if (!result.hasOwnProperty('error')) {
+            return generateApiPostRequest(`accounts/${social_account_id}/confirm_account`, {}, 1);
+        }
+        else {
+            console.log("Approve error " + result.error)
+        }
+    });
 }
 
 const setPassword = (social_account_id, new_password) => {
@@ -151,17 +159,22 @@ app.post('/api/verify', jsonParser, async (req, res) => {
                     }
                 } else {
                     let result = await CreateAccount(username, password);
-                    console.log(`Account ${username} created`);
                     console.log(result)
-                    let account = await GetAccount(username);
-                    console.log(`Account approval status: ${account?.approved}`);
-                    if (!!account && !account?.approved) {
-                        result = await approveAccount(account.id);
-                        if (!result.hasOwnProperty('error')) {
-                            console.log(`Account ${username}/${account.id} approved`);
+                    if (result.hasOwnProperty("error")) {
+                        res.send(generateResponse(false, result.error));
+                    }
+                    else {
+                        console.log(`Account ${username} created`);
+                        let account = await GetAccount(username);
+                        console.log(`Account approval status: ${account?.approved}`);
+                        if (!!account && !account?.approved) {
+                            result = await approveAccount(account.id);
+                            if (!result.hasOwnProperty('error')) {
+                                console.log(`Account ${username}/${account.id} approved`);
+                            }
+                            console.log(result)
+                            res.send(generateResponse(true, JSON.stringify({username})));
                         }
-                        console.log(result)
-                        res.send(generateResponse(true, JSON.stringify({username})));
                     }
                 }
             }
@@ -186,7 +199,7 @@ app.get('/api/init', (req, res) => {
         id BIGSERIAL PRIMARY KEY,
         code VARCHAR(255) NOT NULL,
         account_id VARCHAR(255),
-        attempts NUMERIC NOT NULL CHECK (attempts > 0),
+        attempts NUMERIC NOT NULL CHECK (attempts >= 0),
         creator VARCHAR(255) NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
         )`);
@@ -218,7 +231,7 @@ const checkInvite = (invite, account_id) => {
 }
 
 const spendInvite = (invite_id) => {
-    console.log(`spendInvite: ${spendInvite}`);
+    console.log(`spendInvite: ${invite_id}`);
     return new Promise(function(resolve, reject) {
         const pool = getPool();
         pool.query(`UPDATE invites
