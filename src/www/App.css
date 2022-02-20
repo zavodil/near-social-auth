@@ -75,3 +75,12 @@ body {
 .hidden {
   display: none;
 }
+
+.mobile-hint {
+  padding-top: 10px;
+  font-size: 20px;
+}
+
+.mobile-hint code {
+  padding: 2px;
+}

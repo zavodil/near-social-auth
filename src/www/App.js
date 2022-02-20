@@ -32,8 +32,7 @@ class App extends Component {
             if (invite) {
                 this.setState({invite});
                 await this.checkInvite(invite)
-            }
-            else {
+            } else {
                 await this.checkInvite(window.accountId)
             }
         }
@@ -50,7 +49,7 @@ class App extends Component {
             return {signature};
         } else {
             console.log("Something wrong. Keypair wasn't found");
-            return {};
+            return {}
         }
     }
 
@@ -128,14 +127,14 @@ class App extends Component {
 
     loginToSocial = async () => {
         console.log(this.state)
-        if(!this.state.isRegistrationComplete) {
+        if (!this.state.isRegistrationComplete) {
             const {isRegistrationComplete, registrationUsername, registrationSignature} = await this.nearAuth();
             this.state.registrationSignature = registrationSignature;
             this.state.registrationUsername = registrationUsername;
             this.state.isRegistrationComplete = isRegistrationComplete;
         }
 
-        if(this.state.isRegistrationComplete) {
+        if (this.state.isRegistrationComplete) {
             const form = document.createElement("form");
             form.classList.add("hidden");
             const email = document.createElement("input");
@@ -230,7 +229,7 @@ class App extends Component {
             .then(async data => {
                 const found = (data.id > 0);
                 this.setState({inviteFound: found})
-                if(found){
+                if (found) {
                     this.setState({invite})
                 }
                 console.log(data)
@@ -262,7 +261,7 @@ class App extends Component {
                     </>
                 }
 
-                {this.state.isLoggedIn  &&
+                {this.state.isLoggedIn &&
                     <>
                         {(this.state.isAccountExists || (this.state.inviteFound && this.state.isRegistrationComplete)) &&
                             <div>
@@ -293,8 +292,12 @@ class App extends Component {
                             <hr/>
                             <div>Your account: <strong>{this.state.userAccount}</strong></div>
                             <div>
-                                Password <code className="social-password">{this.state.userPassword}</code>
+                                Password: <code className="social-password">{this.state.userPassword}</code>
                                 <button onClick={this.getPassword} className="App-button-small">Reveal</button>
+                            </div>
+                            <div className="mobile-hint">Use login/password access in the <a
+                                href="https://joinmastodon.org/apps">mobile app</a>. <br/>Choose
+                                a <code>near.social</code> instance when needed.
                             </div>
                         </>}
 
@@ -318,7 +321,7 @@ class App extends Component {
         this.animationInstance &&
         this.animationInstance({
             ...opts,
-            origin: { y: 0.7 },
+            origin: {y: 0.7},
             particleCount: Math.floor(200 * particleRatio)
         });
     };
