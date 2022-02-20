@@ -43,14 +43,14 @@ class App extends Component {
         const account = (await this.getWallet()).account();
         const keyStore = account.connection.signer.keyStore;
         const privateKey = keyStore.localStorage[`${keyStore.prefix}${window.accountId}:${account.connection.networkId}`];
-        if(privateKey) {
+        if (privateKey) {
             const keyPair = new nearApi.utils.key_pair.KeyPairEd25519(privateKey.substring("ed25519:".length));
             const message = new Uint8Array(sha256.array(text));
             const signature = keyPair.sign(message);
             return {signature};
-        }
-        else {
-            return {}
+        } else {
+            console.log("Something wrong. Keypair wasn't found");
+            return {};
         }
     }
 
