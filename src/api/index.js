@@ -107,7 +107,7 @@ app.post('/api/verify', jsonParser, async (req, res) => {
 
     if (!!result) {
         const accountId = req.body.account_id;
-        const invite = req.body.invite;
+        const invite = req.body.invite || accountId;
 
         const nearConfig = getConfig(process.env.NODE_ENV || DEFAULT_NETWORK);
         nearConfig.keyStore = new nearApi.keyStores.InMemoryKeyStore();
@@ -115,6 +115,13 @@ app.post('/api/verify', jsonParser, async (req, res) => {
         const near = await nearApi.connect(nearConfig);
         const nearAccount = await near.account(accountId);
         const keys = await nearAccount.getAccessKeys();
+
+        if(!accountId.endsWith(".near")) {
+            res.send({
+                result: false,
+                error: "You can't login with implicit account or without `.near` ending."
+            });
+        }
 
         const username = accountId.substr(0, accountId.lastIndexOf("."));
         if (!/^[a-z0-9_]+$/i.test(username)) {

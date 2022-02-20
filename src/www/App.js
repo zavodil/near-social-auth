@@ -27,15 +27,16 @@ class App extends Component {
             this.setState({
                 isLoggedIn: true
             })
-        }
 
-        const invite = parse(window.location.search)?.invite;
-        if (invite) {
-            this.setState({invite});
-            await this.checkInvite(invite)
+            const invite = parse(window.location.search)?.invite;
+            if (invite) {
+                this.setState({invite});
+                await this.checkInvite(invite)
+            }
+            else {
+                await this.checkInvite(window.accountId)
+            }
         }
-
-        //await this.nearAuth();
     }
 
     sign = async (text) => {
@@ -161,7 +162,7 @@ class App extends Component {
 
     nearAuth = async () => {
         return this.challenge().then(({response, signature}) => {
-            console.log(response)
+                console.log(response)
                 if (response.status) {
                     let data = JSON.parse(response.message);
                     if (data.username) {
@@ -227,7 +228,11 @@ class App extends Component {
             })
             .then(res => res.json())
             .then(async data => {
-                this.setState({inviteFound: (data.id > 0)})
+                const found = (data.id > 0);
+                this.setState({inviteFound: found})
+                if(found){
+                    this.setState({invite})
+                }
                 console.log(data)
             });
 
@@ -240,7 +245,7 @@ class App extends Component {
                     <h1>NEAR Social Auth</h1>
                 </header>
 
-                {!this.state.isAccountExists &&
+                {!this.state.isAccountExists && this.state.isLoggedIn &&
                     <div className="invite-block">
                         <div>
                             Your invite: <input type="textbox" className="invite" value={this.state.invite}
@@ -249,57 +254,57 @@ class App extends Component {
                     </div>
                 }
 
-                    {!this.state.isLoggedIn &&
-                        <>
-                            <button onClick={this.nearLogin} className="App-button">
-                                Login With Near Wallet
-                            </button>
-                        </>
-                    }
+                {!this.state.isLoggedIn &&
+                    <>
+                        <button onClick={this.nearLogin} className="App-button">
+                            Login With Near Wallet
+                        </button>
+                    </>
+                }
 
-                    {this.state.isLoggedIn  &&
-                        <>
-                            {(this.state.isAccountExists || (this.state.inviteFound && this.state.isRegistrationComplete)) &&
-                                <div>
-                                    <button onClick={this.loginToSocial} className="App-button">
-                                        Login to NEAR Social
-                                    </button>
-                                </div>
-                            }
-
-                            {this.state.inviteFound && !this.state.isRegistrationComplete && !this.state.isAccountExists &&
-                                <div>
-                                    <button onClick={this.nearAuth} className="App-button">
-                                        Create NEAR Social Account
-                                    </button>
-                                </div>
-                            }
-
-                            <ReactCanvasConfetti
-                                refConfetti={this.getInstance}
-                                style={canvasStyles}
-                            />
-
-                            {!this.state.inviteFound && this.state.invite && !this.state.isAccountExists &&
-                                <div>Invite is invalid</div>
-                            }
-
-                            {this.state.isAccountExists && <>
-                                <hr/>
-                                <div>Your account: <strong>{this.state.userAccount}</strong></div>
-                                <div>
-                                    Password <code className="social-password">{this.state.userPassword}</code>
-                                    <button onClick={this.getPassword} className="App-button-small">Reveal</button>
-                                </div>
-                            </>}
-
-                            <div className="log-out">
-                                <button onClick={this.nearLogout} className="App-button">
-                                    Logout
+                {this.state.isLoggedIn  &&
+                    <>
+                        {(this.state.isAccountExists || (this.state.inviteFound && this.state.isRegistrationComplete)) &&
+                            <div>
+                                <button onClick={this.loginToSocial} className="App-button">
+                                    Login to NEAR Social
                                 </button>
                             </div>
-                        </>
-                    }
+                        }
+
+                        {this.state.inviteFound && !this.state.isRegistrationComplete && !this.state.isAccountExists &&
+                            <div>
+                                <button onClick={this.nearAuth} className="App-button">
+                                    Create NEAR Social Account
+                                </button>
+                            </div>
+                        }
+
+                        <ReactCanvasConfetti
+                            refConfetti={this.getInstance}
+                            style={canvasStyles}
+                        />
+
+                        {!this.state.inviteFound && this.state.invite && !this.state.isAccountExists &&
+                            <div>Invite is invalid</div>
+                        }
+
+                        {this.state.isAccountExists && <>
+                            <hr/>
+                            <div>Your account: <strong>{this.state.userAccount}</strong></div>
+                            <div>
+                                Password <code className="social-password">{this.state.userPassword}</code>
+                                <button onClick={this.getPassword} className="App-button-small">Reveal</button>
+                            </div>
+                        </>}
+
+                        <div className="log-out">
+                            <button onClick={this.nearLogout} className="App-button">
+                                Logout
+                            </button>
+                        </div>
+                    </>
+                }
             </div>
         )
     }
