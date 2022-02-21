@@ -176,6 +176,11 @@ class App extends Component {
                         return (userData);
                     }
                 }
+                else {
+                    if(response?.error) {
+                        alert(response.error);
+                    }
+                }
             }
         )
     }

@@ -117,7 +117,7 @@ app.post('/api/verify', jsonParser, async (req, res) => {
         const keys = await nearAccount.getAccessKeys();
 
         if(!accountId.endsWith(".near")) {
-            res.send({
+            return res.send({
                 result: false,
                 error: "You can't login with implicit account or without `.near` ending."
             });
@@ -125,7 +125,7 @@ app.post('/api/verify', jsonParser, async (req, res) => {
 
         const username = accountId.substr(0, accountId.lastIndexOf("."));
         if (!/^[a-z0-9_]+$/i.test(username)) {
-            res.send({
+            return res.send({
                 result: false,
                 error: "Validation failed: Username must contain only letters, numbers and underscores"
             })
@@ -135,7 +135,7 @@ app.post('/api/verify', jsonParser, async (req, res) => {
         let invite_data = await checkInvite(invite, accountId);
         console.log(invite_data)
         if(!account && !invite_data.id) {
-            res.send(generateResponse(false, "Invalid invite code"));
+            return res.send(generateResponse(false, "Invalid invite code"));
         }
         else {
             if(!account) {
@@ -144,46 +144,51 @@ app.post('/api/verify', jsonParser, async (req, res) => {
             }
 
             let nearSocialKey = keys.find(key => key.public_key === req.body.publicKey);
-            if (nearSocialKey.access_key.permission.FunctionCall.receiver_id === NEAR_SOCIAL_CONTRACT_ID) {
-                // key found
+            try {
+                if (nearSocialKey && nearSocialKey.access_key.permission.FunctionCall.receiver_id === NEAR_SOCIAL_CONTRACT_ID) {
+                    // key found
 
-                // password: 16 chars from end of message signature
-                const password = Buffer.from(signature).toString('base64').substr(70, 16);
-                console.log(password)
+                    // password: 16 chars from end of message signature
+                    const password = Buffer.from(signature).toString('base64').substr(70, 16);
+                    console.log(password)
 
-                if (!!account) {
-                    if (!account?.approved) {
-                        let result = await approveAccount(account.id);
-                        if (!result.hasOwnProperty('error')) {
-                            console.log(`Account ${username} approved`);
-                        }
-                        console.log(result)
-                        res.send(generateResponse(true, JSON.stringify({username})));
-                    } else {
-                        await setPassword(account.id, password);
-                        console.log(`Password for account ${username}/${account.id} updated to ${password}`);
-                        res.send(generateResponse(true, JSON.stringify({username})));
-                    }
-                } else {
-                    let result = await CreateAccount(username, password);
-                    console.log(result)
-                    if (result.hasOwnProperty("error")) {
-                        res.send(generateResponse(false, result.error));
-                    }
-                    else {
-                        console.log(`Account ${username} created`);
-                        let account = await GetAccount(username);
-                        console.log(`Account approval status: ${account?.approved}`);
-                        if (!!account && !account?.approved) {
-                            result = await approveAccount(account.id);
+                    if (!!account) {
+                        if (!account?.approved) {
+                            let result = await approveAccount(account.id);
                             if (!result.hasOwnProperty('error')) {
-                                console.log(`Account ${username}/${account.id} approved`);
+                                console.log(`Account ${username} approved`);
                             }
                             console.log(result)
                             res.send(generateResponse(true, JSON.stringify({username})));
+                        } else {
+                            await setPassword(account.id, password);
+                            console.log(`Password for account ${username}/${account.id} updated to ${password}`);
+                            res.send(generateResponse(true, JSON.stringify({username})));
+                        }
+                    } else {
+                        let result = await CreateAccount(username, password);
+                        console.log(result)
+                        if (result.hasOwnProperty("error")) {
+                            return res.send(generateResponse(false, result.error));
+                        } else {
+                            console.log(`Account ${username} created`);
+                            let account = await GetAccount(username);
+                            console.log(`Account approval status: ${account?.approved}`);
+                            if (!!account && !account?.approved) {
+                                result = await approveAccount(account.id);
+                                if (!result.hasOwnProperty('error')) {
+                                    console.log(`Account ${username}/${account.id} approved`);
+                                }
+                                console.log(result)
+                                res.send(generateResponse(true, JSON.stringify({username})));
+                            }
                         }
                     }
                 }
+            }
+            catch (err) {
+                console.log(`Key error ${err.message}`);
+                res.send(generateResponse(false, err.message));
             }
         }
     } else {
